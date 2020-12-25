@@ -1,10 +1,6 @@
 # Dependency-Parser-With-Neural-Networks
 
-## Abstract
-This work proposes a way of learning a neural network classifier for use in a greedy, transition-based dependency parser. This classifier learns and uses a relatively small number of dense features and achieves an about 2% improvement in unlabeled and labeled attachment scores on both English and Chinese datasets compared to dependency parsers that classify based on millions of sparse indicator features.
-
-## Introduction
-As the basis of this parser, we employ the arc-standard system. We will train a feed-forward neural network to predict the transitions of an arc-standard dependency parser. The input to this network will be a representation of the current state (including words on the stack and buffer). The output will be a transition (shift, left_arc, right_arc), together with a dependency relation label. 
+This is an unofficial implmentation of [A Fast and Accurate Dependency Parser using Neural Networks](https://www.aclweb.org/anthology/D14-1082/). This work proposes a way of learning a neural network classifier for use in a greedy, transition-based dependency parser. This classifier learns and uses a relatively small number of dense features and achieves an about 2% improvement in unlabeled and labeled attachment scores on both English and Chinese datasets compared to dependency parsers that classify based on millions of sparse indicator features. As the basis of this parser, we employ the arc-standard system. We will train a feed-forward neural network to predict the transitions of an arc-standard dependency parser. The input to this network will be a representation of the current state (including words on the stack and buffer). The output will be a transition (shift, left_arc, right_arc), together with a dependency relation label. 
 
 
 ## Prequisites: Installing necessary packages
@@ -47,9 +43,7 @@ Using TensorFlow backend. >>>
 
 This repo contains the following python files:
 
-- **conll_reader
-
-** - This file defines data structures that represent a dependency tree. It also includes methods that read and write trees in the CoNLL-X format (explained below).
+- **conll_reader** - This file defines data structures that represent a dependency tree. It also includes methods that read and write trees in the CoNLL-X format (explained below).
 - **get_vocab.py** - This file contains methods that extract a set of words and POS tags that appear in the training data. This is necessary to format the input to the neural net (the dimensionality of the input vectors depends on the number of words).
 - **extract_training_data.py** - This file extracts two numpy matrices representing input output pairs (as described below). You will have to modify this file to change the input representation to the neural network.
 - **train_model.py** - This file pecifies and trains the neural network model. This script writes a file containing the model architecture and trained weights.
@@ -93,7 +87,7 @@ The file **conll_reader.py** contains classes for representing dependency trees 
 The class DependencyEdge represents a singe word and its incoming dependency edge. It includes the attribute variables id, word, pos, head, deprel. Id is just the position of the word in the sentence. Word is the word form and pos is the part of speech. Head is the id of the parent word in the tree. Deprel is the dependency label on the edge pointing to this label. Note that the information in this class is a subset of what is represented in the CoNLL format.
 The class DependencyStructure represents a complete dependency parse. The attribute deprels is a dictionary that maps integer word ids to DependencyEdge instances. The attribute root contains the integer id of the root note. The method print_conll returns a string representation for the dependency structure formatted in CoNLL format (including line breaks).
 
-
+## Obtaining the Vocabulary
 
 Because we will use one-hot representations for words and POS tags, we will need to know which words appear in the data, and we will need a mapping from words to indices.
 Run the following to generate an index of words and POS indices.
@@ -117,19 +111,21 @@ hello 7
 
 The first 5 entries are special symbols. <CD> stands for any number (anything tagged with the POS tag CD), <NNP> stands for any proper name (anything tagged with the POS tag NNP). <UNK> stands for unknown words (in the training data, any word that appears only once). <ROOT> is a special root symbol (the word associated with the word 0, which is initially placed on the stack of the dependency parser). <NULL> is used to pad context windows.
   
-  
+## Extracting Input/Output matrices for training
   
 To train the neural network we first need to obtain a set of input/output training pairs. More specifically, each training example should be a pair (x,y), where x is a parser state and y is the transition the parser should make in that state.
 
 
 Take a look at the file **extract_training_data.py**
-- States: The input will be an instance of the class State, which represents a parser state. The attributes of this class consist of a stack, buffer, and partially built dependency structure deps. stack and buffer are lists of word ids (integers).
+- **States**: The input will be an instance of the class State, which represents a parser state. The attributes of this class consist of a stack, buffer, and partially built dependency structure deps. stack and buffer are lists of word ids (integers).
 The top of the stack is the last word in the list stack[-1]. The next word on the buffer is also the last word in the list, buffer[-1].
 Deps is a list of (parent, child, relation) triples, where parent and child are integer ids and relation is a string (the dependency label).
-- Transitions: The output is a pair (transition, label), where the transition can be one of "shift", "left_arc", or "right_arc" and the label is a dependency label. If the transition is "shift", the dependency label is None. Since there are 45 dependency relations (see list deps_relations), there are 45*2+1 possible outputs.
+- **Transitions**: The output is a pair (transition, label), where the transition can be one of "shift", "left_arc", or "right_arc" and the label is a dependency label. If the transition is "shift", the dependency label is None. Since there are 45 dependency relations (see list deps_relations), there are 45*2+1 possible outputs.
 
 **Obtaining oracle transitions and a sequence of input/output examples.**
-We cannot observe the transitions directly from the treebank. We only see the resulting dependency structures. We therefore need to convert the trees into a sequence of (state, transition) pairs that we use for training. This part is implemented in the function get_training_instances(dep_structure). Given a DependencyStructure instance, this method returns a list of (State, Transition) pairs in the format described above.
+
+
+We cannot observe the transitions directly from the treebank. We only see the resulting dependency structures. We therefore need to convert the trees into a sequence of (state, transition) pairs that we use for training. This part is implemented in the function **get_training_instances(dep_structure)**. Given a DependencyStructure instance, this method returns a list of (State, Transition) pairs in the format described above.
 
 
 **get_input_representation(self, words, pos, state)** takes as parameters a list of words in the input sentence, a list of POS tags in the input sentence and an instance of class State. It should return an encoding of the input to the neural network, i.e. a single vector.
@@ -142,12 +138,10 @@ This representation is a subset of the features in the Chen & Manning (2014) pap
 **get_output_representation(self, output_pair)** takes a (transition, label) pair as its parameter and return a one-hot representation of these actions. Because there are 45*2+1 = 91 possible outputs, the output should be represented as a one-hot vector of length 91.
 
 
-## Saving training matrices
+**Saving training matrices**
+
 The neural network will take two matrices as its input, a matrix of training data (in the basic case a N x 6 matrix, where N is the number of training instances) and an output matrix (an Nx91 matrix).
-The function get_training_matrices(extractor, in_file) will take a FeatureExtractor instance and a file object (a CoNLL formatted file) as its input. It will then extract state-transition sequences
- 
-and call the input and output representation methods on each to obtain input and output vectors. Finally it will assemble the matrices and return them.
-The main program in **extract_training_data.py** calls get_training_matrices to obtain the matrices and then writes them to two binary files (encoded in the numpy array binary format). You can call it like this:
+The function get_training_matrices(extractor, in_file) will take a FeatureExtractor instance and a file object (a CoNLL formatted file) as its input. It will then extract state-transition sequences and call the input and output representation methods on each to obtain input and output vectors. Finally it will assemble the matrices and return them. The main program in **extract_training_data.py** calls get_training_matrices to obtain the matrices and then writes them to two binary files (encoded in the numpy array binary format). You can call it like this:
 
 ```
 $python extract_training_data.py data/train.conll data/input_train.npy data/target_train.npy
@@ -166,7 +160,7 @@ Now that we have training data, we can build the actual neural net. In the file 
 
 The main function of **train_model.py** will load in the input and output matrices and then train the network. We will train the network for 10 epochs with a batch_size of 100. You can also implement early stopping with the validation set and other addtional features provided by Keras. Training will take a while on a CPU-only setup.
 ```
-python train_model.py data/input_train.npy data/target_train.npy data/model.h5
+$python train_model.py data/input_train.npy data/target_train.npy data/model.h5
 ```
 
 ## Greedy Parsing Algorithm - Building and Evaluating the Parser
@@ -182,13 +176,21 @@ Unfortunately, it is possible that the highest scoring transition is not possibl
 
 Running the program like this should print CoNLL formatted parse trees for the sentences in the input.
 ```
-python decoder.py data/model.h5 data/dev.conll
+$python decoder.py data/model.h5 data/dev.conll
 ```
 
 To evaluate the parser, run the program evaluate.py, which will compare your parser output to the target dependency structures and compute labeled and unlabeled attachment accuracy.
 
 ```
-python decoder.py data/model.h5 data/test.conll
+$python decoder.py data/model.h5 data/test.conll
 ```
 
 Labeled attachment score is the percentage of correct (parent, relation, child) predictions. Unlabeled attachment score is the percentage of correct (parent, child) predictions.
+
+
+The score for the parser is relatively low (~70 LAS). The current state of the art is ~90. Feel free to experiment with additional features to improve the parser.
+
+
+## References
+
+[1]: Danqi Chen and Christopher D. Manning. "[A Fast and Accurate Dependency Parser using Neural Networks](https://www.aclweb.org/anthology/D14-1082/)"
